@@ -1,0 +1,99 @@
+function Z=l_applysvm_sp23n(img,sp,svm,svmedge)
+
+%% init
+lambda = 0.3;
+
+[h w d] = size(img);
+% wsize = floor(min(h,w)/16);
+
+%% FEATURE_R11
+% [labels modes v mu] = l_feat_sp23(imgname,false);
+[labels modes v mu] = l_feat_sp23n(img, sp);
+N = max(max(labels));
+V = zeros(N,1);
+Z = zeros(h,w);
+S = zeros(h,w);
+for i=1:N
+    [g,s] = predict(svm,v(i,:));
+    S(labels==i) = s(2);
+    Z(labels==i) = g;
+    V(i)=s(2);
+end
+M = max(max(S));
+m = min(min(S));
+
+figure;
+subplot(151); imshow(img);
+subplot(152); imshow(S);
+subplot(153); imshow((S-m)/(M-m));
+
+%% CRF
+% [fimage labels modes] = edison_wrapper(img, @rgb2Lab);
+% labels=labels+1;
+% N = max(max(labels));
+
+se = strel('arbitrary',ones(3,3));
+
+lab = reshape(modes,[N 1 3]);
+rgb = yuv2rgb(lab);
+
+A = zeros(N,N);
+E = zeros(h,w);
+H = zeros(1,22);
+m=0;
+
+for i=1:N-1
+    s1 = (labels==i);
+    s1 = imdilate(s1,se);
+    for j=i+1:N
+        s2 = labels==j;
+        if (sum(sum(s1 & s2))>0)
+            if (v(i,1)<v(j,1))
+                H(1:11) = v(i,1:11);
+                H(12:22) = v(j,1:11);
+            else
+                H(1:11) = v(j,1:11);
+                H(12:22) = v(i,1:11);
+            end
+            [g,s] = predict(svmedge,H);
+            s=s(2);
+            if (s<m) m=s; end
+            if s>1 s=1; end
+            if s<-1 s=-1; end
+            s0=(1+s)/2;
+            A(i,j)=(1-2*s0)/2;
+            E(s1&s2) = s0;
+        end
+    end
+end
+
+A = lambda*sparse(A+A'+0.5*eye(N));
+
+subplot(154);imshow(E);
+
+T = sparse(double(N),2);
+for i=1:N
+    if (V(i)>0) V(i)=(V(i)/M)^2;
+    else V(i)=-(V(i)/m)^2;
+    end
+    T(i,1)=abs(V(i)-1);
+    T(i,2)=abs(V(i)+1);
+end
+
+[flow,L] = maxflow(A,T);
+
+%% output
+Z = zeros(h,w);
+for i=1:N
+    Z(labels==i) = L(i);
+end
+subplot(155);imshow(Z);
+ZG = imguidedfilter(Z,img,'DegreeOfSmoothing',0.01,'NeighborhoodSize',round(min(h,w)/20));
+
+imwrite(showdata(S),strcat('./backlit/',imgname,'_s1.png'));
+imwrite(S>0,strcat('./backlit/',imgname,'_svm1.png'));
+imwrite(E,strcat('./backlit/',imgname,'_s2.png'));
+imwrite(Z,strcat('./backlit/',imgname,'_out.png'));
+imwrite(ZG,strcat('./backlit/',imgname,'_guided.png'));
+
+end
