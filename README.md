@@ -12,15 +12,15 @@ MaxFlow v3.01 library (http://vision.csd.uwo.ca/code/)
 Please find the zip packages in the root folder, unzip them, and include them before run.
 
 
-Usage:
+__Usage__
 
-run "backlit_demo" function at the package folder
+run `backlit_demo` function:
 
-out = backlit_demo(img)
+`out = backlit_demo(img)`
 
-img: input, the RGB image loaded from imread()
+`img`: input, the RGB image loaded from imread()
 
-out: output RGB image.
+`out`: output RGB image.
 
 
 Test set available in "backlit_data.zip".
